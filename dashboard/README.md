@@ -1,4 +1,4 @@
-# Streamlit dashboard — Phases 1 and 2
+# Streamlit dashboard — Phases 1, 2 and 3
 
 Run from the repository root (Python 3.11+):
 
@@ -18,7 +18,7 @@ volatility, comparisons, correlations and summary downloads remain available.
 ## Data and portfolio definition
 
 Only the five explicit `data/data_dashboard/data_preML_<Sector>.csv` files load.
-The master `data_preML.csv` is excluded. Each sector must have nine stocks and
+The master `data_preML.csv` is excluded. Each built-in sector must have nine stocks and
 complete matching date coverage. The supplied files each contain 24,453 rows
 covering 2,717 dates, 2015-03-02 through 2025-12-16.
 
@@ -46,11 +46,7 @@ historical visualization is not an out-of-sample strategy backtest.
 
 ## Uploads
 
-The sidebar accepts UTF-8 CSVs with `Ticker`, `DlyCalDt`, `DlyClose`. Validation
-checks nonempty data, dates/tickers, positive finite closes and duplicate stock/date
-keys. A preview shows the first 50 rows and row/stock counts. Additional columns
-are retained. Uploads do not replace sector data, write files, infer split adjustment,
-or run preprocessing. Full preprocessing belongs to Phase 3.
+Raw and engineered uploads support validation, processing, CSV export and session-only research. See Phase 3 below for the financial schema and eligibility requirements.
 
 ## Verification
 
@@ -91,8 +87,8 @@ data and isolated job namespaces. Runtime never executes notebooks or consumes
 saved notebook outputs. Notebook SHA-256 references are in `ml/provenance.json`.
 
 Cell 1 uses the existing, already-prepared nine-stock sector CSV instead of
-rebuilding or overwriting the master/Tech exports. All five files satisfy the
-original dimensions and chronological split contract. `tech_tickers` remains an
+rebuilding or overwriting the master/Tech exports. All five bundled files satisfy the
+original dimensions and chronological split contract; uploaded cardinalities are generalized in Phase 3. `tech_tickers` remains an
 internal compatibility name for the selected sector's nine tickers. The original
 2015–2021 Train, 2022–2023 Validation and 2024–2025 Test boundaries are retained.
 Purging, train-only nested LOFO, factor selection and historical ECDF are unchanged.
@@ -167,3 +163,74 @@ The local verification report is `.cache/verification.json`. This establishes
 code reproduction in the installed environment, not an independently certified
 investment performance claim. Full historical runs for every model/sector
 combination are not part of the fast test suite.
+
+## Phase 3 — raw and engineered uploads
+
+The sidebar's **Validate / Process CSV** action accepts:
+
+- Raw, unadjusted daily records with `PERMNO`, `Ticker`, `DlyCalDt`, `DlyOpen`,
+  `DlyHigh`, `DlyLow`, `DlyClose`, `DlyVol`, `DlyCap`, `sprtrn`, and
+  `DlyCumFacShr`. Capitalization is in thousands of USD. Cumulative share factors
+  must correspond to the supplied unadjusted prices/volume. Never supply already
+  adjusted raw prices with non-unit factors. Dropped source fields such as bid,
+  ask, DlyRet, DlyRetx and DlyCumFacPr are not required by the retained formulas.
+- Complete engineered sector CSVs with all 43 reference columns. Confirm that
+  prices are already split-adjusted; this cannot be established from the schema
+  alone. Columns are reordered and types/dates/tickers normalized, but features
+  and adjustments are not applied again. Available adjacent RET_1 and ten-row
+  TARGET_10 values are checked against prices; first-day returns and final-ten-row
+  labels cannot be independently reconstructed from a truncated engineered file.
+
+Validation checks unique headers, required fields, finite numbers, one-to-one
+Ticker/PERMNO identity, daily dates, duplicate keys, positive/integer volume and
+identifiers, OHLC ordering, capitalization, market-return agreement and adjustment
+factors. Raw source missing values are rejected as in the notebook. Output shows
+row counts, removed incomplete rows, date range, stock count, preview, model
+eligibility reasons and a downloadable CSV in the exact 43-column order.
+
+`features.py` contains the retained per-stock formulas from engineering Cells
+2–6 and 9; `upload_data.py` implements the Decimal/ROUND_HALF_UP split convention,
+TARGET_10 and chronological cleaning/splits. Price rounding is eight decimal
+places; adjusted volume must remain integral. No forward fill, interpolation,
+winsorization or invented financial fields are used. Market/peer features and
+TARGET_5 are omitted because Phase 2 consumes only the retained 31 features and
+TARGET_10. Cleaning checks these retained columns, so degenerate uploads are not
+required to compute discarded peer-group statistics. This reproduces every row
+of the supplied reference output. Undefined retained features are dropped,
+including the 39-observation warm-up and final ten target observations. Every
+stock needs at least 50 raw observations and at least one complete output row.
+
+Split boundaries remain 2021-12-31 / 2023-12-31 / 2025-12-31. Later dates are rejected
+rather than silently classified as holdout. No permanent boundary purge occurs
+in the exported CSV: the existing walk-forward engine dynamically purges ten
+observations per stock before fitting. Historical features use past/current
+observations only; forward values are isolated to TARGET_10.
+
+Choose **Uploaded dataset** after validation to replace the research input on
+sector pages. Home continues to show the five bundled sectors and explicitly
+indicates when an upload is active. Select **Built-in sectors** to restore bundled
+research. A valid export may be ineligible for modeling: at least three stocks,
+matching per-date stock coverage, and at least 40 usable observations per stock
+in every year 2015–2025 are required by the unchanged walk-forward schedule.
+Further notebook assertions can still reject degenerate model inputs. Stock and
+row-count assertions are generalized; estimator parameters and calculations are
+unchanged. All four model tabs and all 17 Cell 8 controls are retained.
+
+Uploads, processed frames, training caches and execution results live in the
+individual Streamlit session. Uploaded cache keys incorporate content, sector,
+model, numerical-library versions, source/configuration and a session identifier.
+Uploaded runs never read/write built-in persistent caches, never export server-side
+CSV files, and never mutate bundled data. CSV downloads use the actual in-memory
+result. Reloading into a new session requires uploading again. C8_OUTPUT_DIR is
+retained for compatibility but only built-in runs use server-side exports.
+
+Reference extraction can be regenerated with:
+
+```sh
+python dashboard/tools/extract_features.py
+```
+
+Notebook hashes are recorded in `processing_provenance.json`. The original
+notebooks and datasets remain unchanged. No new dependencies are required for
+Phase 3. Full non-Tech tree-model baselines (12 combinations) remain unverified;
+they are executable on demand and are not labeled verified performance.

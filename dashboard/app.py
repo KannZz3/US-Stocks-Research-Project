@@ -8,6 +8,7 @@ import charts
 import market
 import results
 import model_ui
+import upload_ui
 
 ROOT = Path(__file__).resolve().parent
 st.set_page_config(page_title="Dashboard", page_icon="◈", layout="wide")
@@ -152,8 +153,9 @@ def portfolio_chart(curves, key):
     figure = charts.lines(selected, "Portfolio value · inception = 100", height=520)
     figure.update_xaxes(rangeslider_visible=True)
     figure.update_layout(dragmode="zoom", margin=dict(t=150))
-    plot(figure, "Source: data/data_dashboard/ · split-adjusted closing prices · excludes dividends")
-    st.caption("Nine stocks per sector, equal capital at inception and fixed holdings thereafter. Date filters do not reset the base or rebalance holdings.")
+    origin = "session upload" if key != "home" and active_upload is not None else "data/data_dashboard/"
+    plot(figure, f"Source: {origin} · split-adjusted closing prices · excludes dividends")
+    st.caption("Equal capital per constituent at inception and fixed holdings thereafter. Date filters do not reset the base or rebalance holdings.")
 
 
 with st.sidebar:
@@ -161,8 +163,8 @@ with st.sidebar:
     page = st.radio("Pages", ["Home", *market.SECTORS], key="page", label_visibility="collapsed")
     st.divider()
     uploaded = st.file_uploader("Upload stock CSV", type=["csv"])
-    upload_preview(uploaded)
-    st.caption("Phase 2 · Models & history")
+    active_upload = upload_ui.render(uploaded)
+    st.caption("Phase 3 · Research workspace")
 
 try:
     stamps = tuple(market.fingerprint(DATA_DIR / f"data_preML_{s}.csv") for s in market.SECTORS)
@@ -173,6 +175,7 @@ except ValueError as error:
 
 if page == "Home":
     st.title("Sector overview")
+    if active_upload is not None: st.info("Upload active for sector research pages. Home retains the five bundled sector comparison.")
     st.write("Five sectors. Forty-five stocks. One historical view.")
     curves = pd.concat({name: market.buy_and_hold(frame) for name, frame in sectors.items()}, axis=1)
     portfolio_chart(curves, "home")
@@ -181,11 +184,20 @@ if page == "Home":
     st.caption("Fixed supplied universe; selection/survivorship bias may remain. These are historical price portfolios, not model results.")
 else:
     stocks = sectors[page]
-    st.title(page)
+    if active_upload is not None:
+        from upload_data import export_csv
+        try:
+            stocks,_ = market.load_stocks(export_csv(active_upload))
+        except ValueError as error:
+            st.warning(f'Upload is available for export, but chart/model coverage is insufficient: {error}')
+            for tab,model in zip(st.tabs(MODELS),MODELS):
+                with tab: model_ui.render(page,model,active_upload,st.session_state['upload_scope'])
+            st.stop()
+    st.title(page if active_upload is None else f"{page} · Uploaded research")
     st.caption(" · ".join(sorted(stocks.ticker.unique())))
     for tab, model in zip(st.tabs(MODELS), MODELS):
         with tab:
-            model_ui.render(page, model)
+            model_ui.render(page, model, active_upload, st.session_state.get("upload_scope", "") if active_upload is not None else "")
     portfolio_chart(market.buy_and_hold(stocks).rename(page).to_frame(), page)
     with st.expander("Explore individual stocks", expanded=True):
         explore()

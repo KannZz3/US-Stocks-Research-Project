@@ -12,13 +12,23 @@ def reset(prefix,model):
         st.session_state[prefix+name] = ','.join(value) if name=='C8_OHLC_COLS' else value
 
 
-def render(sector,model):
-    prefix=f'{sector}:{model}:'
+def render(sector,model,dataset=None,scope=""):
+    from upload_data import digest, eligibility
+    prefix=f'{sector}:{model}:' if dataset is None else f'{scope}:{digest(dataset)}:{sector}:{model}:'
+    if dataset is not None:
+        reasons=eligibility(dataset)
+        if reasons:
+            st.warning('Model execution disabled: '+'; '.join(reasons))
+            st.button('Run Backtest',key=prefix+'disabled',disabled=True)
+            return
+        st.caption('Uploaded dataset: session-only caches and CSV downloads; no server-side CSV exports.')
+    memory=st.session_state.setdefault('upload_training_cache',{})
     try:
-        path=engine.cache_path(sector,model)
+        path=engine.cache_path(sector,model,dataset,scope)
     except Exception as error:
         st.error(f'Model unavailable: {error}'); return
-    st.caption('Cells 1–7 cached' if path.exists() else 'Cells 1–7 not computed. Training runs only when requested.')
+    cache_status=st.empty()
+    cache_status.caption('Cells 1–7 cached' if (path.exists() if dataset is None else path.name in memory) else 'Cells 1–7 not computed. Training runs only when requested.')
     st.warning('Test parameter experimentation is exploratory, not an untouched holdout. Dividends, borrowing and financing are not modeled.')
     st.button('Reset Defaults',key=prefix+'reset',on_click=reset,args=(prefix,model))
     with st.form(prefix+'form'):
@@ -42,9 +52,10 @@ def render(sector,model):
         st.session_state.pop(result_key,None)
         try:
             with st.status('Running pipeline',expanded=True) as status:
-                state=engine.train(sector,model,st.write)
-                result=engine.backtest(state,model,params)
-                engine.save_result(engine.result_path(sector,model,params),result)
+                state=engine.train(sector,model,st.write,dataset,memory,scope)
+                cache_status.caption("Cells 1–7 cached")
+                result=engine.backtest(state,model,params,export=dataset is None)
+                if dataset is None: engine.save_result(engine.result_path(sector,model,params),result)
                 st.session_state[result_key]=(path.name,result)
                 status.update(label='Backtest completed; notebook audits passed',state='complete')
         except Exception as error:
@@ -52,7 +63,7 @@ def render(sector,model):
             with st.expander('Failure details'):
                 st.code(traceback.format_exc())
             return
-    if result_key not in st.session_state:
+    if dataset is None and result_key not in st.session_state:
         cached=engine.result_path(sector,model,engine.defaults(model))
         if cached.exists():
             with cached.open('rb') as f: st.session_state[result_key]=(path.name,pickle.load(f))

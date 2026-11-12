@@ -31,13 +31,25 @@ def stages(model):
 
 
 def source(stage):
-    return (ROOT/'stages'/f'{stage}.py').read_text(encoding='utf-8')
+    text=(ROOT/'stages'/f'{stage}.py').read_text(encoding='utf-8')
+    # Generalize only reference dataset cardinalities, never model parameters.
+    class Cardinalities(ast.NodeTransformer):
+        def visit_Constant(self,node):
+            expressions={9:'len(tech_tickers)',15516:'len(train_pool)',15426:'len(train_pool)-len(tech_tickers)*HORIZON',4509:'len(val_pool)',4419:'len(val_pool)-len(tech_tickers)*HORIZON'}
+            if type(node.value) is int and node.value in expressions:
+                return ast.copy_location(ast.parse(expressions[node.value],mode='eval').body,node)
+            return node
+    class Counts(ast.NodeTransformer):
+        def visit_Assert(self,node):
+            return Cardinalities().visit(node)
+    return ast.unparse(ast.fix_missing_locations(Counts().visit(ast.parse(text))))
 
 
-def identity(sector,model):
+def identity(sector,model,dataset=None,scope=""):
     if sector not in SECTORS: raise ValueError('Unknown sector')
     path=REPO/'data/data_dashboard'/f'data_preML_{sector}.csv'
-    h=hashlib.sha256(path.read_bytes())
+    h=hashlib.sha256(path.read_bytes() if dataset is None else dataset.to_csv(index=False,float_format="%.17g").encode())
+    h.update(scope.encode())
     h.update((sector+model).encode())
     for file in [Path(__file__),ROOT/'defaults.json',*(ROOT/'stages'/f'{s}.py' for s in stages(model))]:
         h.update(file.read_bytes())
@@ -46,17 +58,19 @@ def identity(sector,model):
     return h.hexdigest()
 
 
-def cache_path(sector,model):
-    return CACHE / (identity(sector,model)+'.pkl')
+def cache_path(sector,model,dataset=None,scope=""):
+    return CACHE / (identity(sector,model,dataset,scope)+'.pkl')
 
 
-def load_data(sector):
-    data=pd.read_csv(REPO/'data/data_dashboard'/f'data_preML_{sector}.csv',parse_dates=['DlyCalDt'],float_precision='round_trip')
+def load_data(sector,dataset=None):
+    data=pd.read_csv(REPO/'data/data_dashboard'/f'data_preML_{sector}.csv',parse_dates=['DlyCalDt'],float_precision='round_trip') if dataset is None else dataset.copy(deep=True)
     data=data.sort_values(['PERMNO','DlyCalDt']).reset_index(drop=True)
     features=[c for c in data if c not in RAW+['TARGET_10','Split']]
-    assert data.shape==(24453,43) and len(features)==31
-    assert data.Ticker.nunique()==data.PERMNO.nunique()==9
-    assert data.groupby('Ticker').size().eq(2717).all()
+    from upload_data import eligibility
+    reasons=eligibility(data)
+    if reasons: raise ValueError('; '.join(reasons))
+    assert data.shape[1]==43 and len(features)==31
+    assert data.Ticker.nunique()==data.PERMNO.nunique()
     assert data.groupby('Ticker').PERMNO.nunique().eq(1).all()
     assert not data.duplicated(['PERMNO','DlyCalDt']).any()
     assert np.isfinite(data[features+['TARGET_10']].to_numpy()).all()
@@ -80,11 +94,14 @@ def hydrate(state,model):
     return ns
 
 
-def train(sector,model,progress=lambda message: None):
-    path=cache_path(sector,model)
-    if path.exists():
+def train(sector,model,progress=lambda message: None,dataset=None,memory=None,scope=""):
+    path=cache_path(sector,model,dataset,scope)
+    if dataset is not None:
+        if memory is None or not scope: raise ValueError("Uploads require a session-owned cache and scope")
+        if path.name in memory: return memory[path.name]
+    if dataset is None and path.exists():
         with path.open('rb') as f: return pickle.load(f)
-    ns=load_data(sector)
+    ns=load_data(sector,dataset)
     for stage in stages(model):
         progress(stage)
         exec(compile(source(stage),stage,'exec'),ns)
@@ -94,6 +111,9 @@ def train(sector,model,progress=lambda message: None):
         try: pickle.dumps(value,protocol=5)
         except (TypeError,pickle.PicklingError): continue
         state[name]=value
+    if dataset is not None:
+        memory[path.name]=state
+        return state
     CACHE.mkdir(exist_ok=True)
     fd,temp=tempfile.mkstemp(dir=CACHE,suffix='.tmp')
     try:
@@ -104,7 +124,7 @@ def train(sector,model,progress=lambda message: None):
     return state
 
 
-def backtest(state,model,parameters):
+def backtest(state,model,parameters,export=True):
     expected=defaults(model)
     if set(parameters)!=set(expected): raise ValueError('Cell 8 parameter keys must match defaults')
     ns=hydrate(copy.deepcopy(state),model)
@@ -113,6 +133,7 @@ def backtest(state,model,parameters):
     result = {k:v for k,v in ns.items() if k.startswith('cell8_') and isinstance(v,pd.DataFrame)} | {
         'enabled_sides':ns['C8_ENABLED_SIDES'], 'parameters':copy.deepcopy(parameters)}
 
+    if not export: return result
     destination=(CACHE/'exports'/str(parameters['C8_OUTPUT_DIR'])).resolve()
     base=(CACHE/'exports').resolve()
     if not destination.is_relative_to(base): raise ValueError('Output directory must stay inside the local cache export directory')
