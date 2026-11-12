@@ -86,7 +86,7 @@ def test_interactive_submit_and_reset():
     button.click().run()
     assert not app.exception and not app.error
     assert app.session_state['Tech:Elastic Net:result'][1]['parameters']['C8_MIN_VOTES']==3
-    app.button(key='Tech:Elastic Net:reset').click().run()
+    next(b for b in app.button if b.label=='Reset Defaults' and 'Elastic Net' in b.key).click().run()
     assert app.number_input(key='Tech:Elastic Net:C8_MIN_VOTES').value==5
 
 

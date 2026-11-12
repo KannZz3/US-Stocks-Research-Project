@@ -3,31 +3,60 @@ import numpy as np
 import pandas as pd
 import plotly.graph_objects as go
 
-COLORS = ["#70D6C3", "#91ABF6", "#E3BE7A", "#BC9CE9", "#E796A6", "#85BBCB"]
+COLORS = ["#76C5B5", "#8EADEF", "#D9B77A", "#BD9ACF", "#DC909D", "#8BB8C8"]
+FONT = "system-ui, -apple-system, Segoe UI, sans-serif"
+
+
+def render(figure, **kwargs):
+    import streamlit as st
+
+    st.plotly_chart(
+        figure, theme=None, width="stretch",
+        config={"displaylogo": False, "modeBarButtonsToRemove": ["select2d", "lasso2d"]},
+        **kwargs,
+    )
 
 
 def style(figure, title, percent=False, height=360):
+    legend = len(figure.data) > 1
     figure.update_layout(
-        template="plotly_dark", title=dict(text=title, x=.01, y=.98, yanchor="top", font_size=16),
-        paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)",
-        font=dict(color="#CDD9E9", family="Arial", size=12), colorway=COLORS,
-        margin=dict(l=15, r=20, t=78, b=30), height=height, hovermode="x unified",
-        legend=dict(orientation="h", y=1.02, x=0, yanchor="bottom"))
-    figure.update_xaxes(showgrid=False)
-    figure.update_yaxes(gridcolor="rgba(160,180,205,.10)", zeroline=False)
+        template="plotly_dark", title=dict(text=title, x=0, xref="paper", y=.98,
+                                          yanchor="top", font_size=14),
+        paper_bgcolor="#101419", plot_bgcolor="#101419",
+        font=dict(color="#AEBBC9", family=FONT, size=12), colorway=COLORS,
+        margin=dict(l=12, r=14, t=(80 if title else 60) if legend else (42 if title else 16), b=32),
+        height=height, hovermode="x unified", showlegend=legend,
+        legend=dict(orientation="h", y=1.02, x=0, yanchor="bottom", font=dict(size=11)),
+        hoverlabel=dict(bgcolor="#1B242C", bordercolor="#394953", font=dict(color="#E1E7EE")),
+    )
+    figure.update_xaxes(showgrid=False, automargin=True, linecolor="#303A44", showline=True,
+                        tickfont=dict(size=11), nticks=7)
+    figure.update_yaxes(gridcolor="#252E37", zeroline=False, automargin=True,
+                        tickfont=dict(size=11), nticks=6)
     if percent:
         figure.update_yaxes(tickformat=".0%")
     return figure
 
 
-def lines(frame, title, percent=False, height=360):
+def lines(frame, title, percent=False, height=360, unit=None):
     if isinstance(frame, pd.Series):
         frame = frame.to_frame()
     figure = go.Figure()
+    fmt = ".2%" if percent else ",.2f"
     for column in frame:
-        figure.add_trace(go.Scatter(x=frame.index, y=frame[column], name=str(column), mode="lines",
-                                   line_width=1.8, connectgaps=False))
-    return style(figure, title, percent, height)
+        figure.add_trace(go.Scatter(
+            x=frame.index, y=frame[column], name=str(column), mode="lines",
+            line_width=1.7, connectgaps=False,
+            hovertemplate=("$" if unit == "USD" else "") + "%{y:" + fmt + "}",
+        ))
+    style(figure, title, percent, height)
+    if isinstance(frame.index, pd.DatetimeIndex):
+        figure.update_xaxes(hoverformat="%d %b %Y")
+    if unit == "USD":
+        figure.update_yaxes(tickprefix="$")
+    elif unit == "index":
+        figure.update_yaxes(tickformat=",~g")
+    return figure
 
 
 def price(frame, ticker, kind, averages):
@@ -42,7 +71,8 @@ def price(frame, ticker, kind, averages):
     for average in averages:
         figure.add_trace(go.Scatter(x=frame.date, y=frame[average], name=average, mode="lines", line_width=1.2))
     style(figure, f"{ticker} · Share price", height=440)
-    figure.update_yaxes(title="USD · prices as supplied")
+    figure.update_yaxes(tickprefix="$")
+    figure.update_xaxes(hoverformat="%d %b %Y")
     return figure
 
 

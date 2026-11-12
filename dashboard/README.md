@@ -12,7 +12,7 @@ Validation and Test results are separate. Tabs expose performance, equity/drawdo
 
 ## CSV uploads
 
-Upload a UTF-8 CSV and select **Validate / Process CSV**.
+Upload a UTF-8 CSV and select **Validate CSV**.
 
 Raw inputs require:
 

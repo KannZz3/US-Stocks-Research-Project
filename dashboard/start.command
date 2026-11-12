@@ -8,4 +8,6 @@ if ! .venv/bin/python -c 'import streamlit, pandas, numpy, plotly' >/dev/null 2>
   .venv/bin/python -m pip install -r requirements.txt
 fi
 print "Starting dashboard. Keep this window open; Ctrl+C stops it."
-exec .venv/bin/python -m streamlit run app.py --server.headless false
+dashboard_dir="$PWD"
+cd ..
+exec "$dashboard_dir/.venv/bin/python" -m streamlit run dashboard/app.py --server.headless false

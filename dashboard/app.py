@@ -11,13 +11,14 @@ import model_ui
 import upload_ui
 
 ROOT = Path(__file__).resolve().parent
-st.set_page_config(page_title="Dashboard", page_icon="◈", layout="wide")
+st.set_page_config(page_title="US Stocks Research", layout="wide", initial_sidebar_state="auto")
 st.markdown(f"<style>{(ROOT / 'style.css').read_text(encoding='utf-8')}</style>", unsafe_allow_html=True)
 
 
-def plot(figure, source="Source: historical stock CSV."):
-    st.plotly_chart(figure, width="stretch", config={"displaylogo": False})
-    st.caption(source)
+def plot(figure, source=None):
+    charts.render(figure)
+    if source:
+        st.caption(source)
 
 
 def number(value, percent=False):
@@ -52,8 +53,6 @@ def table(frame, filename):
 
 
 def explore():
-    st.subheader("Explore stocks")
-    st.write("See one stock’s price, trading activity and daily returns.")
     a, b, c = st.columns([1, 1, 2])
     ticker = a.selectbox("Stock", sorted(stocks.ticker.unique()), key="stock")
     kind = b.selectbox("Price chart", ["Line", "Candlestick"], key="chart_type")
@@ -66,12 +65,11 @@ def explore():
     if frame.empty:
         st.info("No trading days in this range. Try a wider date range.")
         return
-    st.caption(f"Showing {len(frame):,} trading days. Earlier dates are available in the date selectors; the full dataset starts {history.date.min():%d %b %Y}.")
+    st.caption(f"{len(frame):,} trading days · split-adjusted prices")
     last = frame.iloc[-1]
     cards([("Last close", number(last.close)), ("Last daily return", number(last["return"], True)),
            ("20-day annualized volatility", number(last.Volatility, True))])
     plot(charts.price(frame, ticker, kind, averages))
-    st.caption("Prices are split-adjusted upstream. Moving averages use past observations only. A candlestick shows the day’s open, high, low and close.")
     if st.toggle("Show volume", value=True):
         plot(charts.bars(frame.set_index("date").volume, "Daily trading volume"))
     left, right = st.columns(2)
@@ -79,12 +77,10 @@ def explore():
         plot(charts.bars(frame.set_index("date")["return"], "Daily reported returns", percent=True, height=310))
     with right:
         plot(charts.lines(frame.set_index("date").Volatility, "20-day volatility · annualized", percent=True, height=310))
-    st.caption("Returns use RET_1, a close-to-close price return excluding dividends. Volatility measures how much daily returns fluctuate; this chart annualizes it using 252 trading days.")
+    st.caption("Close-to-close returns exclude dividends. Volatility is annualized using 252 trading days.")
 
 
 def compare_stocks():
-    st.subheader("Compare stocks")
-    st.write("Choose stocks and a date range to compare their growth and risk.")
     tickers = sorted(stocks.ticker.unique())
     chosen = st.multiselect("Stocks", tickers, default=tickers[:3], key="compare_stocks")
     window = dates(pd.DatetimeIndex(stocks.date), "compare", years=3)
@@ -143,28 +139,30 @@ def upload_preview(uploaded):
 
 
 def portfolio_chart(curves, key):
-    window = dates(curves.index, key)
+    first, last = curves.index[[0, -1]]
+    with st.popover("Chart settings"):
+        window = dates(curves.index, key)
+        scale = st.radio("Value scale", ["Linear", "Log"], horizontal=True, key=f"{key}_scale")
     if window is None:
         return
     selected = curves.loc[str(window[0]):str(window[1])]
     if selected.empty:
         st.info("No trading days in this date range.")
         return
-    figure = charts.lines(selected, "Portfolio value · inception = 100", height=520)
-    figure.update_xaxes(rangeslider_visible=True)
-    figure.update_layout(dragmode="zoom", margin=dict(t=150))
-    origin = "session upload" if key != "home" and active_upload is not None else "data/data_dashboard/"
-    plot(figure, f"Source: {origin} · split-adjusted closing prices · excludes dividends")
-    st.caption("Equal capital per constituent at inception and fixed holdings thereafter. Date filters do not reset the base or rebalance holdings.")
+    figure = charts.lines(selected, "", height=420, unit="index")
+    figure.update_xaxes(rangeslider=dict(visible=True, thickness=.09))
+    figure.update_yaxes(type="log" if scale == "Log" else "linear")
+    plot(figure)
+    st.caption(f"{first:%d %b %Y} – {last:%d %b %Y} · Base 100 at inception · Fixed holdings · Dividends excluded")
 
 
 with st.sidebar:
-    st.markdown('<p class="brand">Stock Research</p>', unsafe_allow_html=True)
+    st.markdown('<p class="eyebrow">RESEARCH</p><p class="brand">US Equities</p>', unsafe_allow_html=True)
     page = st.radio("Pages", ["Home", *market.SECTORS], key="page", label_visibility="collapsed")
     st.divider()
-    uploaded = st.file_uploader("Upload stock CSV", type=["csv"])
+    st.markdown('<p class="eyebrow">DATA</p>', unsafe_allow_html=True)
+    uploaded = st.file_uploader("Upload stock CSV", type=["csv"], label_visibility="collapsed")
     active_upload = upload_ui.render(uploaded)
-    st.caption("Phase 3 · Research workspace")
 
 try:
     stamps = tuple(market.fingerprint(DATA_DIR / f"data_preML_{s}.csv") for s in market.SECTORS)
@@ -176,12 +174,13 @@ except ValueError as error:
 if page == "Home":
     st.title("Sector overview")
     if active_upload is not None: st.info("Upload active for sector research pages. Home retains the five bundled sector comparison.")
-    st.write("Five sectors. Forty-five stocks. One historical view.")
+    st.caption("45 stocks across 5 sectors · Split-adjusted price history")
+    st.subheader("Sector portfolio performance")
     curves = pd.concat({name: market.buy_and_hold(frame) for name, frame in sectors.items()}, axis=1)
     portfolio_chart(curves, "home")
-    for column, sector in zip(st.columns(5), market.SECTORS):
-        column.button(sector, key=f"open_{sector}", on_click=navigate, args=(sector,), width="stretch")
-    st.caption("Fixed supplied universe; selection/survivorship bias may remain. These are historical price portfolios, not model results.")
+    with st.container(key="sector_shortcuts"):
+        for column, sector in zip(st.columns(5), market.SECTORS):
+            column.button(sector, key=f"open_{sector}", on_click=navigate, args=(sector,), width="stretch")
 else:
     stocks = sectors[page]
     if active_upload is not None:
@@ -198,8 +197,9 @@ else:
     for tab, model in zip(st.tabs(MODELS), MODELS):
         with tab:
             model_ui.render(page, model, active_upload, st.session_state.get("upload_scope", "") if active_upload is not None else "")
-    portfolio_chart(market.buy_and_hold(stocks).rename(page).to_frame(), page)
-    with st.expander("Explore individual stocks", expanded=True):
+    with st.expander("Sector portfolio"):
+        portfolio_chart(market.buy_and_hold(stocks).rename(page).to_frame(), page)
+    with st.expander("Explore individual stocks"):
         explore()
     with st.expander("Compare stocks and risk"):
         compare_stocks()
