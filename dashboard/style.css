@@ -1,0 +1,22 @@
+.block-container {max-width:1480px; padding-top:4.7rem; padding-bottom:3rem;}
+[data-testid="stAppViewContainer"] {background:radial-gradient(ellipse at 90% 0%,#182638,#0B111A 55%);}
+[data-testid="stSidebar"] {background:#101925; border-right:1px solid #29374A;}
+[data-testid="stSidebar"] .block-container {padding-top:1.8rem;}
+[data-testid="stMetric"] {background:#141F2D; border:1px solid #29394D; border-radius:12px; padding:17px 19px;}
+[data-testid="stMetricLabel"] {color:#A4B5C9; font-size:.8rem;}
+[data-testid="stMetricValue"] {font-size:1.8rem; font-weight:600;}
+h1 {font-size:2.3rem !important; letter-spacing:-.04em;}
+h2 {font-size:1.3rem !important;}
+h3 {font-size:1.06rem !important;}
+.course {font-size:.72rem; font-weight:700; letter-spacing:.18em; color:#70D6C3; margin-bottom:10px;}
+.brand {font-size:1.25rem; font-weight:700; color:#EEF4FD; margin:0;}
+.muted {color:#95A9C0;}
+.badge {display:inline-block; padding:5px 12px; margin:0 8px 12px 0; border:1px solid #315049; border-radius:30px; color:#99DFCF; background:#16312E; font-size:.75rem;}
+.badge.pending {color:#DFC696; background:#30291E; border-color:#5A4A32;}
+.workflow {display:grid; grid-template-columns:repeat(6,1fr); gap:9px; margin:12px 0 24px;}
+.workflow div {padding:17px 12px; border:1px solid #2B3B4F; border-radius:10px; background:#141F2D; font-size:.78rem;}
+.workflow span {display:block; color:#70D6C3; font-size:.65rem; margin-bottom:8px;}
+.empty {padding:30px; margin:15px 0 25px; background:#142131; border:1px dashed #43556D; border-radius:12px;}
+.empty p {color:#A9BCD2; max-width:750px;}
+.footer {border-top:1px solid #27354A; margin-top:30px; padding-top:15px; color:#8FA2BA; font-size:.75rem;}
+@media(max-width:800px) {.workflow {grid-template-columns:repeat(3,1fr);} h1 {font-size:1.9rem !important;} [data-testid="stMetricValue"] {font-size:1.4rem;}}

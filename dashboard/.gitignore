@@ -1,0 +1,11 @@
+.venv/
+__pycache__/
+.pytest_cache/
+.DS_Store
+.env*
+.streamlit/secrets.toml
+data/
+backtests/*
+!backtests/.gitkeep
+*.pcap*
+*.zst

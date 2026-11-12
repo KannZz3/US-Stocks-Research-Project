@@ -1,0 +1,20 @@
+# Local credentials and environment settings
+.env
+.env.*
+!.env.example
+
+# Editor-local settings
+.vscode/
+
+# Operating system files
+.DS_Store
+Thumbs.db
+Desktop.ini
+
+# Python environments and generated local caches
+.venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.coverage
+.pip-cache/
