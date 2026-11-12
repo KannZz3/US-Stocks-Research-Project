@@ -1,152 +1,84 @@
-# Current dashboard (Phases 1, 2 and 3)
+# US Stocks Quantitative Research
 
-The Streamlit dashboard now reads the five nine-stock sector CSVs under
-`data/data_dashboard/`, excluding the master file. See [dashboard/README.md](dashboard/README.md)
-for launch commands, validation, portfolio methodology and limitations.
-These charts use split-adjusted prices and exclude dividends; `RET_1` is not
-`DlyRet`. Explicit model training, Cell 8 backtesting, and session-isolated raw/engineered CSV processing are available.
+**[Open Dashboard](#quick-start)** — local launch; no live deployment verified.
 
-The preparation notes below describe the older 12-stock workflow and reference
-files that are not present in this checkout. They do not describe the current
-dashboard's inputs or return conventions.
+## Overview
 
----
+A 45-stock research workflow for evaluating machine-learning factor signals against buy-and-hold price portfolios. It combines reproducible preprocessing, chronological model evaluation, OHLC backtesting and an interactive Streamlit dashboard.
 
-# FIN 556 Stock Data Preparation
+## Data
 
-A reproducible Python workflow for preparing the supplied stock dataset for return,
-risk, and portfolio analysis. The source file, `data.csv`, remains unchanged. All
-project code, documentation, output labels, and commit messages use English.
+Five sectors contain nine stocks each:
 
-## Run in VS Code
+| Sector | Tickers |
+| --- | --- |
+| Tech | AAPL, ADBE, AMAT, AMD, AVGO, CRM, MSFT, NVDA, ORCL |
+| Consumption | AMZN, COST, HD, KO, MCD, NKE, SBUX, TJX, WMT |
+| Finance | AXP, BAC, BLK, CME, JPM, MS, PGR, SCHW, V |
+| Utilities | AEP, AWK, D, DUK, EIX, NEE, SO, SRE, XEL |
+| Energy | COP, EOG, LNG, OXY, PSX, SLB, VLO, WMB, XOM |
 
-The project environment is `.venv`. Open `fin556-project.code-workspace` in VS Code.
-The workspace includes Python interpreter selection, unit-test discovery, a build
-task, and a debug configuration.
+The five `data_preML_<Sector>.csv` files each contain 24,453 observations from **2015-03-02 through 2025-12-16**. Their 43 columns comprise ten source fields, 31 technical features, `TARGET_10` and `Split`. The dashboard excludes the master `data_preML.csv`.
 
-- Press **Ctrl+Shift+B** to regenerate the prepared datasets.
-- Select **Prepare stock data** in Run and Debug, then press **F5** to debug.
-- Run **Test data preparation** from **Terminal > Run Task**, or use the Testing panel.
-- If VS Code has a previously selected interpreter, run **Python: Select Interpreter**
-  and choose `.venv/Scripts/python.exe` on Windows.
+Preprocessing split-adjusts OHLC and volume using `DlyCumFacShr`. Retained features describe returns, trend, intraday/overnight behavior, volatility, liquidity and size. `TARGET_10` is the ten-observation forward close-to-close price return. Incomplete feature/target rows are dropped without filling. Returns exclude dividends; `RET_1` is not a total return.
 
-On Windows, new project terminals put `.venv/Scripts` first on PATH and set
-VIRTUAL_ENV directly. Automatic activation scripts are disabled, so no PowerShell
-execution-policy change is required. The workspace also clears inherited PSModulePath
-for new terminals, allowing Windows PowerShell to discover its own compatible modules.
+Training uses 2015–2021, Validation 2022–2023 and Test 2024–2025. Exported boundary rows are retained; ten-observation target purging occurs within model folds.
 
-If an old terminal shows `Unable to load PSReadLine`, create a new terminal after
-loading this workspace. Existing terminals retain their original environment.
-The interpreter must point to `.venv/Scripts/python.exe`, not the `.venv` directory.
+## Methodology
 
-The Python and Python Debugger extensions are recommended by the workspace.
+Elastic Net, XGBoost, CatBoost and LightGBM share the notebook-derived workflow: chronological walk-forward evaluation, Train-only scaling and nested leave-one-feature-out screening, directional ranking, Tier-3 selection and historical empirical-CDF confluence voting. Daily Long/Short conflicts block new entries. Execution factors, weights and signal calibration remain frozen through 2021.
 
-### Terminal commands
+## Backtesting
 
-From the project directory in PowerShell:
+Cell 8 uses after-close signals and next-session OHLC execution. Train-only M calibration sets take-profit and stop-loss distances. Controls cover capital, position sizing/count, votes, entry gaps, holding periods, calibration thresholds, costs, collateral and permitted directions. The UI exposes all 17 adjustable settings, including OHLC mapping and export location.
 
-```powershell
-.\.venv\Scripts\python.exe prepare_data.py
-.\.venv\Scripts\python.exe -m unittest discover -s tests -v
+Validation and Test use independent accounts. Defaults include $100,000 capital, three positions, 33% allocation per position, five votes, a 2.5% entry-gap limit, 15 holding bars and zero transaction costs. Ambiguous same-bar TP/SL touches use stop-first execution. Results include equity, drawdown, return, Sharpe, trade count, win rate, logs, exit diagnostics, calibration and audits.
+
+## Dashboard
+
+Home compares five initially equal-weight, fixed-holding portfolios normalized to 100. Sector pages retain stock charts, volume, moving averages and risk comparisons alongside the four model tabs.
+
+**Run Backtest** trains only when the dataset/model/configuration cache is missing, then recomputes Cell 8. Parameter edits do not retrain upstream stages. Raw or engineered CSV uploads support validation, exact-schema export and session-only research; uploaded data never overwrite bundled files or share training state across sessions. See [dashboard instructions](dashboard/README.md) for input requirements.
+
+## Structure
+
+```text
+data/
+  data_processing/   Raw/processed data and preprocessing notebooks
+  data_dashboard/    Master and five sector exports
+pipeline/            Four authoritative Tech model notebooks
+dashboard/
+  app.py             Streamlit entry point
+  upload_data.py     Validation, adjustment and export
+  features.py        Retained feature formulas
+  ml/                Extracted stages, configuration and caching
+  tests/             Data, execution and UI tests
+  tools/             Extraction and baseline verification
 ```
 
-For a fresh checkout, install Python 3.11 or newer and create the local environment:
+## Quick start
 
-```powershell
+Python 3.12 is the verified environment. From the repository root:
+
+```sh
 python -m venv .venv
-.\.venv\Scripts\python.exe -m pip install -r requirements.txt
-.\.venv\Scripts\python.exe prepare_data.py
 ```
 
-On macOS or Linux, use `.venv/bin/python` instead of `.venv/Scripts/python.exe` and
-select that executable with **Python: Select Interpreter**.
-The script also accepts custom input and output paths:
+Activate with `.venv\Scripts\Activate.ps1` in PowerShell or `source .venv/bin/activate` on macOS/Linux, then:
 
-```powershell
-.\.venv\Scripts\python.exe prepare_data.py --input data.csv --output-dir data/processed
+```sh
+python -m pip install -r dashboard/requirements.txt
+python -m streamlit run dashboard/app.py
 ```
 
-## Prepared files
+Open [localhost:8501](http://localhost:8501). Verify with:
 
-The generated CSVs use UTF-8, English snake_case field names, ISO dates, and decimal
-returns. They are committed so the prepared data can be inspected immediately.
-Regenerate them after changing the source or preparation logic.
+```sh
+python -m pytest dashboard/tests -q
+```
 
-| File in `data/processed/` | Observation unit | Current size | Purpose |
-| --- | --- | --- | --- |
-| `daily.csv` | Security and observed date | 30,432 rows, 25 columns | Validated daily panel; all source fields retained and renamed |
-| `returns_daily.csv` | Observed date | 2,536 rows, 13 columns | Date plus one total-return column per stock |
-| `monthly.csv` | Security and observed month | 1,452 rows, 11 columns | Monthly stock returns, volume, and last observed prices/caps |
-| `returns_monthly.csv` | Observed month | 121 rows, 13 columns | Month plus one total-return column per stock |
-| `market_daily.csv` | Observed date | 2,536 rows, 2 columns | One S&P 500 price return per date |
-| `market_monthly.csv` | Observed month | 121 rows, 5 columns | Compounded market price returns and coverage fields |
-| `quality_report.json` | Source dataset | One report | Source hash, coverage, identifiers, missing values, and output sizes |
+## Verification and limitations
 
-The supplied sample spans **2015-12-01 through 2025-12-31**, with 12 securities:
-ADBE, AMD, AMZN, AAPL, COST, GOOGL, MCD, MSFT, NKE, NVDA, SBUX, and WMT.
-Matrix columns are sorted alphabetically. Daily and monthly stock panels are sorted
-by PERMNO and date/month. The sample contains 121 observed months; no research window
-is removed automatically.
+The suite passes **64 tests**. [Recorded verification](dashboard/PHASE3_VERIFICATION.md) covers reference-data numerical consistency, uploaded execution, cache isolation and leakage checks. [Phase 2 verification](dashboard/VERIFICATION.md) reproduced all four Tech baselines; Elastic Net also ran across all five sectors. The **12 non-Tech tree-model combinations remain unverified historical runs**, available on demand.
 
-## Transformation rules
-
-1. Read the CSV as strings before converting numeric fields. In particular,
-   `DlyRetMissFlg = "NA"` means that a return is available; it is not a missing value.
-2. Keep PERMNO, PERMCO, and CUSIP as identifiers. Preserve leading zeros in CUSIP.
-   Use `(permno, date)` as the daily key and verify that ticker labels map one-to-one
-   to PERMNO throughout this sample before creating ticker-based matrices.
-3. Validate dates, numeric values, unique keys, return bounds, and matching stock
-   coverage. Stop with a clear error for missing required values, ambiguous tickers,
-   duplicate keys, or conflicting same-date market returns. Do not delete records,
-   winsorize returns, forward-fill observations, or insert zero-return dates.
-4. Preserve optional distribution blanks in `DisDivAmt` and `DisFacPr`. Keep flags,
-   dividends, and price adjustment factors for inspection.
-5. Use supplied `DlyRet` and `DlyRetx`; do not reconstruct returns from raw prices.
-   Splits can make unadjusted prices jump. `DlyFacPrc` is a daily adjustment factor,
-   not a cumulative price-adjustment series.
-6. Deduplicate the benchmark by date after checking all repeated values agree.
-   Compound its daily observations only once, even though each source market return
-   appears alongside every stock.
-7. Compound monthly simple returns as `product(1 + daily_return) - 1`.
-   For example, +10% followed by -10% produces -1%, not 0%.
-8. Sum volume within a month. Take price and market cap from the last observed date.
-   Store `first_trading_date`, `last_trading_date`, and `observations` so coverage is
-   visible. Month labels use `YYYY-MM`; they do not invent a calendar month-end trade.
-
-Returns stay in decimal units: `0.016007` means `1.6007%`. Market capitalization
-stays in **thousands of US dollars**. Do not rescale a field just for display.
-
-### Interpretation limits
-
-- Stock matrices contain **total returns**, while `sprtrn` is an S&P 500 **price-return**
-  benchmark excluding dividends. These are different dividend conventions; use a
-  total-return benchmark for like-for-like total-return comparisons.
-- Shared dates are checked against the dates present in the source, not an external
-  exchange calendar. A date missing for all stocks cannot be detected by this check.
-  Monthly values summarize observed source returns; full calendar coverage is not
-  independently certified. A shorter input can contain partial boundary months.
-- D2/D3/D4 duration flags can reflect elapsed calendar days across weekends and
-  holidays. They are retained, not treated automatically as missing trading days.
-- No risk-free series is supplied. The pipeline does not label market-adjusted
-  returns as excess returns or estimate CAPM without the necessary inputs.
-- Field definitions follow CRSP documentation because the column names match that
-  format. The file itself does not independently establish its download provenance.
-
-## Validation and reproducibility
-
-Run the unit tests before committing preparation changes. Tests cover compounding,
-month boundaries, market deduplication, split-day return preservation, last-date
-aggregation, ticker mappings, missing observations, invalid inputs, and output order.
-
-`quality_report.json` records the SHA-256 of the original source. Outputs omit run
-timestamps so identical inputs and code produce identical files. Environment folders
-and caches are excluded from Git. The source and processed data are not edited by
-the unit tests; synthetic fixtures are written only to temporary directories.
-
-## Field reference
-
-See [the data dictionary](docs/data_dictionary.md) for all source-to-output mappings,
-monthly field definitions, and units.
-
-Definitions were checked against the [CRSP Stock Database Format 2.0 Guide](https://www.crsp.org/wp-content/uploads/guides/CRSP_US_Stock_%26_Indexes_Database_Guide_Flat_File_Format_2.0.pdf)
-and the [CRSP Historical Indexes Guide](https://www.crsp.org/crsp_pdf/crsp-historical-indexes-guide/).
+Test parameter experimentation is exploratory. Universe selection bias and external trading-calendar completeness are not independently certified; dividends, borrowing and financing are not modeled. The source ends before year-end 2025. Uploaded adjustment provenance requires correct source factors or explicit confirmation; the fixed model schedule requires matching stock coverage and sufficient history. Failed statistical audits remain visible rather than producing substitute results.
