@@ -20,3 +20,16 @@ h3 {font-size:1.06rem !important;}
 .empty p {color:#A9BCD2; max-width:750px;}
 .footer {border-top:1px solid #27354A; margin-top:30px; padding-top:15px; color:#8FA2BA; font-size:.75rem;}
 @media(max-width:800px) {.workflow {grid-template-columns:repeat(3,1fr);} h1 {font-size:1.9rem !important;} [data-testid="stMetricValue"] {font-size:1.4rem;}}
+/* Desktop: one seventh navigation; native sidebar collapse on mobile. */
+[data-testid="stSidebar"] {position:fixed !important; height:100dvh !important; top:0; left:0;}
+[data-testid="stSidebarContent"] {height:100%; overflow-y:auto;}
+@media(min-width:1000px) {
+  [data-testid="stSidebar"][data-collapsed="false"] {width:14.285714vw !important; min-width:14.285714vw !important; max-width:14.285714vw !important;}
+  [data-testid="stSidebar"] [data-testid="stSidebarUserContent"] {padding-left:1rem; padding-right:1rem;}
+}
+[data-testid="stAppViewContainer"] {color:#E6EDF6;}
+@media(max-width:999px) {[data-testid="stSidebar"] {width:270px; max-width:85vw;} .block-container {padding-left:1rem; padding-right:1rem;}}
+
+@media(min-width:1000px) {
+  [data-testid="stAppViewContainer"]:has([data-testid="stSidebar"][data-collapsed="false"]) [data-testid="stMain"] {margin-left:14.285714vw; width:85.714286vw;}
+}

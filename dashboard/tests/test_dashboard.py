@@ -148,46 +148,100 @@ def test_comparison_does_not_bridge_missing_dates(tmp_path, equity):
     assert common.index.min() == pd.Timestamp("2023-01-05")
 
 
+
+
 @pytest.fixture
-def app(stock_csv, tmp_path, monkeypatch):
-    folder = tmp_path / "backtests"
-    folder.mkdir()
-    monkeypatch.setenv("FIN556_STOCKS_PATH", str(stock_csv))
-    monkeypatch.setenv("FIN556_BACKTEST_DIR", str(folder))
-    return AppTest.from_file(str(ROOT / "app.py"), default_timeout=20), folder
+def app():
+    return AppTest.from_file(str(ROOT / "app.py"), default_timeout=30)
 
 
-@pytest.mark.parametrize("page", ["Overview", "Explore Stocks", "Compare Stocks", "Compare Models", "Strategy Results", "About the Data"])
+@pytest.mark.parametrize("page", ["Home", *market.SECTORS])
 def test_all_pages_without_models(app, page):
-    at, _ = app
-    at.run().radio(key="page").set_value(page).run()
-    assert not at.exception and not at.error
+    app.run().radio(key="page").set_value(page).run()
+    assert not app.exception and not app.error
+    if page == "Home":
+        assert len(app.get("plotly_chart")) == 1
+    else:
+        assert [tab.label for tab in app.tabs[:4]] == ["Elastic Net", "XGBoost", "CatBoost", "LightGBM"]
+        assert sum(x.value == "Not computed" for x in app.info) == 4
+    assert len(app.get("file_uploader")) == 1
 
 
-def test_candles_and_empty_selection(app):
-    at, _ = app
-    at.run().radio(key="page").set_value("Explore Stocks").run()
-    at.selectbox(key="chart_type").set_value("Candlestick").run()
-    assert not at.exception and len(at.get("plotly_chart")) == 4
-    at.radio(key="page").set_value("Compare Stocks").run()
-    at.multiselect(key="compare_stocks").set_value([]).run()
-    assert not at.exception and at.info
+def test_home_buttons_and_exploration(app):
+    app.run()
+    for sector in market.SECTORS:
+        app.button(key=f"open_{sector}").click().run()
+        assert app.radio(key="page").value == sector
+        assert not app.exception
+        app.radio(key="page").set_value("Home").run()
+    app.button(key="open_Tech").click().run()
+    app.selectbox(key="chart_type").set_value("Candlestick").run()
+    assert not app.exception
+    app.multiselect(key="compare_stocks").set_value([]).run()
+    assert not app.exception and app.info
 
 
-def test_result_pages_with_temporary_fixtures(app, equity):
-    at, folder = app
-    equity.to_csv(folder / "fixture.csv", index=False)
-    (folder / "fixture.json").write_text(json.dumps({"initial_capital": 100, "equity_basis": "net", "costs": "Test fixture only"}))
-    for page in ["Compare Models", "Strategy Results"]:
-        at.run().radio(key="page").set_value(page).run()
-        assert not at.exception and not at.error
-        assert len(at.get("plotly_chart")) >= 3
+def test_all_sector_portfolios():
+    sectors = market.load_sectors(ROOT.parent / "data/data_dashboard")
+    assert list(sectors) == list(market.SECTORS)
+    for frame in sectors.values():
+        assert frame.ticker.nunique() == 9
+        curve = market.buy_and_hold(frame)
+        assert curve.iloc[0] == pytest.approx(100)
+        prices = frame.pivot(index="date", columns="ticker", values="close").sort_index()
+        fixed_units = (100 / 9) / prices.iloc[0]
+        np.testing.assert_allclose(curve, prices.mul(fixed_units).sum(axis=1))
+        earlier = frame[frame.date <= curve.index[100]]
+        pd.testing.assert_series_equal(market.buy_and_hold(earlier), curve.iloc[:101])
 
 
-def test_missing_stock_file_keeps_results_page_available(app):
-    at, _ = app
-    at.run().text_input(key="stock_path").set_value("/no/such/file.csv").run()
-    assert not at.error and not at.exception and at.info
-    assert len(at.get("file_uploader")) == 1
-    at.radio(key="page").set_value("Compare Models").run()
+def test_fixed_holdings_are_not_daily_rebalanced():
+    dates = pd.date_range("2024-01-01", periods=3)
+    frame = pd.DataFrame({"date": list(dates)*2, "ticker": ["A"]*3+["B"]*3,
+                          "close": [100,200,100,100,100,200]})
+    assert market.buy_and_hold(frame).tolist() == pytest.approx([100,150,150])
+    with pytest.raises(ValueError):
+        market.buy_and_hold(frame.iloc[1:])
+
+
+@pytest.mark.parametrize("content", [b"", b"x,y\n1,2", b"Ticker,DlyCalDt,DlyClose\nA,bad,2",
+    b"Ticker,DlyCalDt,DlyClose\nA,2024-01-01,-1",
+    b"Ticker,DlyCalDt,DlyClose\nA,2024-01-01,inf",
+    b"Ticker,DlyCalDt,DlyClose\nA,2024-01-01,1\nA,2024-01-01,2"])
+def test_bad_upload(content):
+    with pytest.raises(ValueError):
+        market.preview_upload(content)
+
+
+def test_upload_preview_rendered():
+    # AppTest does not provide a file-uploader setter. Exercise the same UI helper
+    # with an in-memory uploaded-file object instead of relying on private APIs.
+    def upload_harness():
+        from io import BytesIO
+        import runpy
+        from pathlib import Path
+        import market
+        namespace = runpy.run_path(str(Path(market.__file__).with_name("app.py")))
+        namespace["upload_preview"](BytesIO(b"Ticker,DlyCalDt,DlyClose\nAAA,2024-01-01,100"))
+    at = AppTest.from_function(upload_harness, default_timeout=30).run()
     assert not at.exception
+    assert any("Valid CSV" in s.value for s in at.success)
+    assert len(at.dataframe) == 1
+
+
+def test_date_filter_preserves_inception(app):
+    app.run()
+    app.date_input(key="home_start").set_value(pd.Timestamp("2020-01-01").date()).run()
+    assert not app.exception and len(app.get("plotly_chart")) == 1
+    app.date_input(key="home_end").set_value(pd.Timestamp("2019-01-01").date()).run()
+    assert app.warning and not app.exception
+
+
+def test_sector_closes_match_upstream_split_adjustment():
+    raw = pd.read_csv(ROOT.parent / 'data/data_processing/45stocks_daily_raw.csv',
+                      usecols=['Ticker', 'DlyCalDt', 'DlyClose', 'DlyCumFacShr'])
+    raw['date'] = pd.to_datetime(raw.DlyCalDt)
+    for frame in market.load_sectors(ROOT.parent / 'data/data_dashboard').values():
+        joined = frame.merge(raw, left_on=['ticker', 'date'], right_on=['Ticker', 'date'], validate='one_to_one')
+        assert len(joined) == len(frame)
+        np.testing.assert_allclose(joined.close, joined.DlyClose / joined.DlyCumFacShr, atol=1e-8, rtol=1e-8)

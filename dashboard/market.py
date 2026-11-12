@@ -32,11 +32,14 @@ def load_stocks(path):
         raw = pd.read_csv(source, keep_default_na=False)
     except (OSError, ValueError, UnicodeError) as error:
         raise ValueError("Cannot read the stock CSV. Check the path in Data settings.") from error
-    required = {"Ticker", "DlyCalDt", "DlyClose", "DlyRet", "sprtrn"}
+    return_column = "RET_1" if "RET_1" in raw else "DlyRet"
+    required = {"Ticker", "DlyCalDt", "DlyClose", return_column, "sprtrn"}
     missing = sorted(required - set(raw.columns))
     if missing:
         raise ValueError("Missing stock columns: " + ", ".join(missing))
-    df = raw.reindex(columns=COLUMNS).rename(columns=COLUMNS)
+    columns = {k: v for k, v in COLUMNS.items() if k != "DlyRet"}
+    columns[return_column] = "return"
+    df = raw.reindex(columns=columns).rename(columns=columns)
     df["ticker"] = df.ticker.astype("string").str.strip().str.upper()
     df["date"] = pd.to_datetime(df.date, errors="coerce", format="mixed", utc=True).dt.tz_localize(None).dt.normalize()
     if df.empty or df.date.isna().any() or df.ticker.isna().any() or df.ticker.eq("").any():
@@ -83,3 +86,52 @@ def historical_index(returns):
     periods = returns.copy()
     periods.iloc[0] = 0  # The first date is the starting point, not an earned return.
     return 100 * (1 + periods).cumprod(skipna=False)
+
+
+SECTORS = ("Tech", "Consumption", "Finance", "Utilities", "Energy")
+
+
+def load_sectors(folder):
+    """Explicit allowlist excludes the master data_preML.csv and other files."""
+    sectors = {}
+    for sector in SECTORS:
+        path = Path(folder) / f"data_preML_{sector}.csv"
+        try:
+            frame, _ = load_stocks(path)
+            if frame.ticker.nunique() != 9:
+                raise ValueError("Expected exactly nine stocks.")
+            sectors[sector] = frame
+        except ValueError as error:
+            raise ValueError(f"{sector}: {error}") from error
+    return sectors
+
+
+def buy_and_hold(frame):
+    """Equal initial capital, fixed adjusted-share units; never rebalance or fill."""
+    prices = frame.pivot(index="date", columns="ticker", values="close").sort_index()
+    if prices.empty or prices.isna().any().any():
+        raise ValueError("Portfolio needs complete prices for every constituent/date.")
+    if not np.isfinite(prices.to_numpy()).all() or prices.le(0).any().any():
+        raise ValueError("Portfolio prices must be finite and positive.")
+    return (prices / prices.iloc[0]).mean(axis=1) * 100
+
+
+def preview_upload(content):
+    """Validate only; preserve original columns and do not infer price adjustment."""
+    try:
+        raw = pd.read_csv(BytesIO(content), keep_default_na=False)
+    except (ValueError, UnicodeError) as error:
+        raise ValueError("Cannot read this CSV. Use a UTF-8 stock-data CSV.") from error
+    required = {"Ticker", "DlyCalDt", "DlyClose"}
+    if not required.issubset(raw):
+        raise ValueError("Required columns: Ticker, DlyCalDt, DlyClose.")
+    tickers = raw.Ticker.astype("string").str.strip().str.upper()
+    dates = pd.to_datetime(raw.DlyCalDt, errors="coerce", format="mixed", utc=True).dt.normalize()
+    close = pd.to_numeric(raw.DlyClose, errors="coerce")
+    if raw.empty or tickers.eq("").any() or dates.isna().any():
+        raise ValueError("CSV must contain rows with valid tickers and dates.")
+    if close.isna().any() or not np.isfinite(close).all() or close.le(0).any():
+        raise ValueError("DlyClose must contain finite positive prices.")
+    if pd.DataFrame({"ticker": tickers, "date": dates}).duplicated().any():
+        raise ValueError("Duplicate stock/date rows found.")
+    return raw.head(50), {"Rows": len(raw), "Stocks": tickers.nunique()}
