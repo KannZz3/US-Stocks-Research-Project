@@ -162,8 +162,8 @@ def test_all_pages_without_models(app, page):
     if page == "Home":
         assert len(app.get("plotly_chart")) == 1
     else:
-        assert [tab.label for tab in app.tabs[:4]] == ["Elastic Net", "XGBoost", "CatBoost", "LightGBM"]
-        assert sum(x.value == "Not computed" for x in app.info) == 4
+        assert all(name in [tab.label for tab in app.tabs] for name in ["Elastic Net", "XGBoost", "CatBoost", "LightGBM"])
+        assert len([b for b in app.button if b.label == "Run Backtest"]) == 4
     assert len(app.get("file_uploader")) == 1
 
 

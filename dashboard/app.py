@@ -7,6 +7,7 @@ import streamlit as st
 import charts
 import market
 import results
+import model_ui
 
 ROOT = Path(__file__).resolve().parent
 st.set_page_config(page_title="Dashboard", page_icon="◈", layout="wide")
@@ -161,7 +162,7 @@ with st.sidebar:
     st.divider()
     uploaded = st.file_uploader("Upload stock CSV", type=["csv"])
     upload_preview(uploaded)
-    st.caption("Phase 1 · Historical exploration")
+    st.caption("Phase 2 · Models & history")
 
 try:
     stamps = tuple(market.fingerprint(DATA_DIR / f"data_preML_{s}.csv") for s in market.SECTORS)
@@ -184,8 +185,7 @@ else:
     st.caption(" · ".join(sorted(stocks.ticker.unique())))
     for tab, model in zip(st.tabs(MODELS), MODELS):
         with tab:
-            st.info("Not computed")
-            st.caption(f"{model} results are unavailable. Model execution is planned for a later phase.")
+            model_ui.render(page, model)
     portfolio_chart(market.buy_and_hold(stocks).rename(page).to_frame(), page)
     with st.expander("Explore individual stocks", expanded=True):
         explore()

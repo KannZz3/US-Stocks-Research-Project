@@ -1,10 +1,10 @@
-# Current dashboard (Phase 1)
+# Current dashboard (Phases 1 and 2)
 
 The Streamlit dashboard now reads the five nine-stock sector CSVs under
 `data/data_dashboard/`, excluding the master file. See [dashboard/README.md](dashboard/README.md)
 for launch commands, validation, portfolio methodology and limitations.
 These charts use split-adjusted prices and exclude dividends; `RET_1` is not
-`DlyRet`. No model execution or preprocessing is performed by the dashboard.
+`DlyRet`. Explicit model training and Cell 8 backtesting are available; preprocessing remains upstream.
 
 The preparation notes below describe the older 12-stock workflow and reference
 files that are not present in this checkout. They do not describe the current

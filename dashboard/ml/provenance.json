@@ -1,0 +1,18 @@
+{
+  "elastic": {
+    "source": "pipeline\\Data_Elastic Net_Tech.ipynb",
+    "sha256": "10bdeb2526bc5d2889894dde0543dd5fd96ea823f865c868ee7ba5041927777e"
+  },
+  "xgb": {
+    "source": "pipeline\\Data_Xgb_Tech.ipynb",
+    "sha256": "0cec4a72d2cf950d0f8c256135c9dbfad6a7cd9c56236e4384716a4d505dfd8a"
+  },
+  "cat": {
+    "source": "pipeline\\Data_Cat_Tech.ipynb",
+    "sha256": "4ae5cd1fe3b0741649eeaf15be65984400d6908e66a528a137b6869e5cdfb095"
+  },
+  "light": {
+    "source": "pipeline\\Data_Light_Tech.ipynb",
+    "sha256": "a30dbf23bba6f1340265976a68164c89bc3285db6a1fdb8831752133c297b0fc"
+  }
+}

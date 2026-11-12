@@ -1,0 +1,106 @@
+{
+  "elastic": {
+    "C8_START_CAPITAL": 100000.0,
+    "C8_MAX_POSITIONS": 3,
+    "C8_POSITION_FRACTION": 0.33,
+    "C8_MIN_VOTES": 5,
+    "C8_MAX_ENTRY_GAP": 0.025,
+    "C8_MAX_HOLD_BARS": 15,
+    "C8_TP_M_MULT": 2.5,
+    "C8_SL_M_MULT": 0.7,
+    "C8_MIN_STOCK_POSITIVE": 70,
+    "C8_MIN_SIDE_POSITIVE": 70,
+    "C8_M_TRAIN_START_YEAR": 2015,
+    "C8_ZERO_COSTS": true,
+    "C8_COST_BPS_PER_LEG": 1.0,
+    "C8_SHORT_COLLATERAL_RATIO": 1.0,
+    "C8_TRADE_SIDES": [
+      "Long",
+      "Short"
+    ],
+    "C8_OHLC_COLS": [
+      "DlyOpen",
+      "DlyHigh",
+      "DlyLow",
+      "DlyClose"
+    ]
+  },
+  "xgb": {
+    "C8_START_CAPITAL": 100000.0,
+    "C8_MAX_POSITIONS": 3,
+    "C8_POSITION_FRACTION": 0.33,
+    "C8_MIN_VOTES": 5,
+    "C8_MAX_ENTRY_GAP": 0.025,
+    "C8_MAX_HOLD_BARS": 15,
+    "C8_TP_M_MULT": 2.5,
+    "C8_SL_M_MULT": 0.7,
+    "C8_MIN_STOCK_POSITIVE": 70,
+    "C8_MIN_SIDE_POSITIVE": 70,
+    "C8_M_TRAIN_START_YEAR": 2015,
+    "C8_ZERO_COSTS": true,
+    "C8_COST_BPS_PER_LEG": 1.0,
+    "C8_SHORT_COLLATERAL_RATIO": 1.0,
+    "C8_TRADE_SIDES": [
+      "Long",
+      "Short"
+    ],
+    "C8_OHLC_COLS": [
+      "DlyOpen",
+      "DlyHigh",
+      "DlyLow",
+      "DlyClose"
+    ]
+  },
+  "cat": {
+    "C8_START_CAPITAL": 100000.0,
+    "C8_MAX_POSITIONS": 3,
+    "C8_POSITION_FRACTION": 0.33,
+    "C8_MIN_VOTES": 5,
+    "C8_MAX_ENTRY_GAP": 0.025,
+    "C8_MAX_HOLD_BARS": 15,
+    "C8_TP_M_MULT": 2.5,
+    "C8_SL_M_MULT": 0.7,
+    "C8_MIN_STOCK_POSITIVE": 70,
+    "C8_MIN_SIDE_POSITIVE": 70,
+    "C8_M_TRAIN_START_YEAR": 2015,
+    "C8_ZERO_COSTS": true,
+    "C8_COST_BPS_PER_LEG": 1.0,
+    "C8_SHORT_COLLATERAL_RATIO": 1.0,
+    "C8_TRADE_SIDES": [
+      "Long",
+      "Short"
+    ],
+    "C8_OHLC_COLS": [
+      "DlyOpen",
+      "DlyHigh",
+      "DlyLow",
+      "DlyClose"
+    ]
+  },
+  "light": {
+    "C8_START_CAPITAL": 100000.0,
+    "C8_MAX_POSITIONS": 3,
+    "C8_POSITION_FRACTION": 0.33,
+    "C8_MIN_VOTES": 5,
+    "C8_MAX_ENTRY_GAP": 0.03,
+    "C8_MAX_HOLD_BARS": 15,
+    "C8_TP_M_MULT": 2.5,
+    "C8_SL_M_MULT": 0.7,
+    "C8_MIN_STOCK_POSITIVE": 70,
+    "C8_MIN_SIDE_POSITIVE": 70,
+    "C8_M_TRAIN_START_YEAR": 2015,
+    "C8_ZERO_COSTS": true,
+    "C8_COST_BPS_PER_LEG": 1.0,
+    "C8_SHORT_COLLATERAL_RATIO": 1.0,
+    "C8_TRADE_SIDES": [
+      "Long",
+      "Short"
+    ],
+    "C8_OHLC_COLS": [
+      "DlyOpen",
+      "DlyHigh",
+      "DlyLow",
+      "DlyClose"
+    ]
+  }
+}
